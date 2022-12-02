@@ -1,0 +1,9 @@
+*~
+/__pycache__/
+gpclist_unadded.txt
+bin/*
+build/*
+note
+temp*
+autoexec.sh
+presolve.py
