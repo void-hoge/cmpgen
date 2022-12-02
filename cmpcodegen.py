@@ -103,8 +103,8 @@ class compressor:
                     self.instructions.append({'src':srcwires, 'dst':dstwires,
                                               'gpc':{'src':src, 'dst':dst}})
 
-    def emulate(self, src):
-        '''Emulates the operation of the circuit from the generated instruction sequence and the SRC.
+    def simulate(self, src):
+        '''Simulates the operation of the circuit from the generated instruction sequence and the SRC.
         Returns the final stage of the compressor as the same format as as SRC.
         '''
         wire = [[0 for _ in range(self.wirelen[i])] for i in range(self.colmax)]
@@ -139,8 +139,8 @@ class compressor:
         return result
 
     def test(self):
-        '''Generates the first stage SRC of the compressor randomly and execute the self.emulate.
-        Returns a tuple of correct and emulated sum.
+        '''Generates the first stage SRC of the compressor randomly and execute the self.simulate.
+        Returns a tuple of correct and simulated sum.
         '''
         src = {i:[] for i in range(self.colmax)}
         srctotal = 0
@@ -148,19 +148,19 @@ class compressor:
             num = random.randint(0, (1<<self.stages[0][i])-1)
             src[i] = self.getbinlist(num, self.stages[0][i])
             srctotal += sum(src[i])<<i
-        dst = self.emulate(src)
+        dst = self.simulate(src)
         dsttotal = 0
         for i in range(self.colmax):
             dsttotal += sum(dst[i])<<i
         return (srctotal, dsttotal)
 
     def randomtest(self, iteration):
-        '''Executes self.test() ITERATION times and returns True if the all CORRECT equal to emulated sum.
+        '''Executes self.test() ITERATION times and returns True if the all CORRECT equal to simulated sum.
         '''
         for i in range(iteration):
-            correct, emulate = self.test()
-            print(f'correct: {correct}, emulate: {emulate}', file=sys.stderr)
-            if correct != emulate:
+            correct, simulate = self.test()
+            print(f'correct: {correct}, simulate: {simulate}', file=sys.stderr)
+            if correct != simulate:
                 return False
         return True
 
@@ -326,7 +326,7 @@ class compressor:
             srctot = 0
             for i in range(self.colmax):
                 srctot += sum(src[i])<<i
-                dst = self.emulate(src)
+                dst = self.simulate(src)
                 dsttot = 0
             for i in range(self.colmax):
                 dsttot += sum(dst[i])<<i
@@ -380,16 +380,16 @@ class compressor:
         return code
 
 def main():
-    #random.seed(a=0)
-    emulator = compressor()
-    emulator.parse()
-    emulator.build()
-    print('PASS' if emulator.randomtest(20) else 'FAIL', file=sys.stderr)
-    #emulator.dump()
-    print(emulator.codegen())
-    # if you do not need testmodule, just commentout the next lines.
-    #print(emulator.gen_implement_test())
-    print(emulator.gen_behavioral_test())
+    random.seed(a=0)
+    simulator = compressor()
+    simulator.parse()
+    simulator.build()
+    print('PASS' if simulator.randomtest(20) else 'FAIL', file=sys.stderr)
+    #simulator.dump()
+    print(simulator.codegen())
+    # if you do not need testmodule, just commentout the following lines.
+    #print(simulator.gen_implement_test())
+    print(simulator.gen_behavioral_test())
 
 if __name__ == '__main__':
     main()
