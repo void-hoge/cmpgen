@@ -91,7 +91,7 @@ $ ./comp32 # テストを実行(左側が入力、右側が出力)
 $
 ```
 
-## パフォーマンス
+## パフォーマンスの例
 - 32x32の正方形の入力
   - cmpgen(7200秒の最適化): 142スライス
   - naive(上と同じ出力になるように記述した上でVivadoで合成): 174スライス
@@ -105,82 +105,82 @@ $
 - 例
   - `GPC(3;2)`は、1の位に3ビット入力して2ビット出力するGPC(全加算器)
   - `GPC(6,1,5;5)`は、1の位に5ビット、2の位に1ビット、3の位に6ビット入力するGPC
-  - `GPC(6,1,5,5) 4`は、このGPCのコストが4であることを表す。
+  - `GPC(6,1,5,5) 4`は、このGPCのコストが4であることを表します。
 #### parsegpc.py
 - gpclistのパーサ
 #### testgpcgen.py
 - `./testgpcgen.py <gpclist>`
-- GPCの単純な実装を得る。
-- iverilogなどのシミュレータで動かすためのテスト用GPCを生成する。
+- GPCの単純な実装を出力します。
+- iverilogなどのシミュレータで動かすためのテスト用GPCを生成します。
 #### allgpcs.v
 - GPCのXilinx社のFPGA向けの実装
 
 ### Problem Generator
-- ILPとしてソルバーに入力する各種定数を生成し、標準出力に出力する。
+- ILPとしてソルバーに入力する各種定数を生成し、標準出力に出力します。
 - problem classは下の2つの基底クラス
 #### square.py
-- NxNの正方形の形に入力する。
+- NxNの正方形の形に入力するコンプレッサの問題を生成します。
 - `./square.py <gpclist> <N> <stagemin> <stagemax>`
-- gpclistはGPCを論理的な形状を記述したファイル(gpclist.txt)
-- stageminは探索を開始するステージ数、stagemaxは探索を終了するステージ数
+- gpclistはGPCを論理的な形状を記述したファイル(gpclist.txt)です。
+- stageminは探索を開始するステージ数、stagemaxは探索を終了するステージ数です。
 #### popcounter.py
 - Nビットのポップカウンタ
 - `./popcounter.py <gpclist> <N> <stagemin> <stagemax>`
 
 ### Solver(cmpgen)
-- `build/cmpgen --help`でコマンドラインオプションに関するhelpが表示される。
+- `build/cmpgen --help`でコマンドラインオプションに関するhelpが表示されます。
 #### 問題/解の入力
-- ファイルまたは標準入力から解か問題を入力できる。
-- 問題か解かは、入力から自動的に判定される。
+- ファイルまたは標準入力から解か問題を入力できます。
+- 問題か解かは、入力から自動的に判定されます。
 #### 解の出力
-- 何も指定しない場合、標準出力に解を出力する。
-- `-o <filename>`で出力先ファイルを指定できる。
-- ステージ数が小さすぎるか、タイムアウトして解が見つからなかった場合は`std::logic_error`を投げて終了する。
+- 何も指定しない場合、標準出力に解を出力します。
+- `-o <filename>`で出力先ファイルを指定します。
+- ステージ数が小さすぎるか、タイムアウトして解が見つからなかった場合は`std::logic_error`を投げて終了します。
 #### 目的関数の設定
-- `--objective=(mingpcnum|mincost|none)`で目的関数を設定できる。
-  - `mingpcnum`は(1;1)を除いたGPCの数を最小化する。
-  - `mincost`はgpclistに記述されたGPCのコストの和を最小化する。
-  - `none`は目的関数なし。
-- デフォルトでは`mincost`が選択される。
-- 解が存在するときは`none`が速く1つ目の解を発見し、解が存在しないときは`mingpcnum`が解の非存在性を高速に証明する傾向にあることが分かっている。
+- `--objective=(mingpcnum|mincost|none)`で目的関数を設定できます。
+  - `mingpcnum`は(1;1)を除いたGPCの数を最小化します。
+  - `mincost`はgpclistに記述されたGPCのコストの和を最小化します。
+  - `none`は目的関数なしです。
+- デフォルトでは`mincost`が選択されます。
+- 解が存在するときは`none`が速く1つ目の解を発見し、解が存在しないときは`mingpcnum`が解の非存在性を高速に証明する傾向にあることが分かっています。
 #### 制限時間の設定
-- `--timelimit=<time>`で制限時間を設定できる。
-- 問題を入力した場合、それぞれのステージ数でこの制限時間が適用される。
+- `--timelimit=<time>`で制限時間を設定できます。
+- 問題を入力した場合、それぞれのステージ数でこの制限時間が適用されます。
 #### 問題を入力した場合
-- stageminから始めてstagemaxまで探索を行い、1つ目の解を発見したら終了する。
+- stageminから始めてstagemaxまで探索を行い、1つ目の解を発見したら終了します。
 #### 解を入力した場合
-- 入力された解を初期解として最適化を行う。
+- 入力された解を初期解として最適化を行います。
 
 
 ### Solution Parser/Converter
-- ソルバーの解をパースし、変換する。
-- solution classはproblemを継承している。
+- ソルバーの解をパースし、変換します。
+- solution classはproblemを継承しています。
 #### solutionconv.py
-- 標準入力からcmpgenの出力を入力すると、cmpcodegen.pyで読み込める形式に変換し、標準出力に表示する。
+- 標準入力からcmpgenの出力を入力すると、cmpcodegen.pyで読み込める形式に変換し、標準出力に表示します。
 - `cat solution.txt | solutionconv.py`
 #### margegpcs.py
-- ある解のGPCリストにGPCを追加する。
-- これの出力をさらに`cmpgen`に入力して最適化を行える。
-- 結果は標準出力に表示される。
+- ある解のGPCリストにGPCを追加します。
+- これの出力をさらに`cmpgen`に入力して最適化を行えます。
+- 結果は標準出力に表示されます。
 - `./margegpcs.py <solution> <gpclist_added>`
-- もとのGPCリストは、`<gpclist_added>`のサブセットである必要がある。
-- `<solution>`は、`solutionconv.py`で変換したものではなく、`cmpgen`で出力される解
+- もとのGPCリストは、`<gpclist_added>`のサブセットである必要があります。
+- `<solution>`は、`solutionconv.py`で変換したものではなく、`cmpgen`で出力される解です。
 
 
 ### Code Generator
 #### cmpcodegen.py
-- `solutionconv.py`の出力を標準入力に入力し、コンプレッサのVerilog moduleを標準出力に出力する。
-- `compressor.gen_behavioral_test()`で、動作テスト用のモジュールを出力できる。
-- `compressor.gen_implement_test()`で、シフトレジスタを用いた実装テスト用のモジュールを出力できる。(正方形の入力しか対応していない。)
-- 入力をパースした結果から回路をシミュレーションしてテストを行える。その結果は標準エラー出力に表示される。
+- `solutionconv.py`の出力を標準入力に入力し、コンプレッサのVerilog moduleを標準出力に出力します。
+- `compressor.gen_behavioral_test()`で、動作テスト用のモジュールを出力します。
+- `compressor.gen_implement_test()`で、シフトレジスタを用いた実装テスト用のモジュールを出力できます。(正方形の入力のみ対応)
+- 入力をパースした結果から回路をシミュレーションしてテストを行える。その結果は標準エラー出力に表示されます。
 
 ## バグ検出
-- このプロジェクトはcmpcodegen.pyとその出力モジュールの2箇所でテストを行える。
+- このプロジェクトはcmpcodegen.pyとその出力モジュールの2箇所でテストを行えます。
 ### cmpcodegen.pyのテストが通らないとき
-- コンプレッサーのモデル(解)と、`cmpcodegen.py`でパースされるモデルが食い違っている可能性が高い。
+- コンプレッサーのモデル(解)と、`cmpcodegen.py`でパースされるモデルが食い違っている可能性が高いです。
 ### behavioral_testが通らないとき
-- 出力されたモジュールによる和が異なるとき、GPCの実装かコードジェネレータにバグを含んでいる。
-- simple_gpcs.vのような可能な限りシンプルなGPCの実装をコンプレッサに結合してテストすることで、GPCの実装のバグかどうかが分かるはず。
+- 出力されたモジュールによる和が異なるとき、GPCの実装かコードジェネレータにバグを含んでいます。
+- simple_gpcs.vのような可能な限りシンプルなGPCの実装をコンプレッサに結合してテストすることで、GPCの実装のバグかどうかが分かるはずです。
 
 ## Author
 - Mugi Noda(void-hoge)
