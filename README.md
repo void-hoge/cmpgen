@@ -1,7 +1,6 @@
 # CMPGEN
 - CMPGEN(Compressor Generator)は、一般化並列カウンタ(Generalized Parallel Counter; GPC)を用いた多入力加算器(コンプレッサ)を効率的にFPGAに実装するためのツール群です。
 - IBM ILOG CPLEXを用いて、コンプレッサの最小化問題を解き、その結果をVerilog HDLのモジュールとして出力します。
-- これにより、Vivado等の合成系で自動生成したときに比べ、クリティカルパス遅延をほぼ犠牲にすることなく、半分ほどの回路的コストで実装することができます。(問題によりますが)
 
 
 ## コンプレッサ
