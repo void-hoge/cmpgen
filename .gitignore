@@ -1,4 +1,5 @@
 *~
+/vivado/
 /__pycache__/
 gpclist_unadded.txt
 bin/*

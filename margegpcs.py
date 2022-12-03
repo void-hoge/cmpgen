@@ -5,8 +5,12 @@ import parsegpc
 from solution import solution
 
 def main():
-    solfilename = sys.argv[1]
-    gpcfilename = sys.argv[2]
+    try:
+        solfilename = sys.argv[1]
+        gpcfilename = sys.argv[2]
+    except IndexError:
+        print(f'Usage: {sys.argv[0]} <solution> <gpclist>', file=sys.stderr)
+        sys.exit(1)
     rawsol = open(solfilename, 'r').read()
     rawgpcs = open(gpcfilename, 'r').read()
     sol = solution(rawsol)

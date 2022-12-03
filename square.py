@@ -18,7 +18,10 @@ class square(problem):
         self.colnum = int(math.log2(((1<<self.size)-1)*self.size))+1
         self.finalstage = finalstage
         self.gpcnum = len(self.gpcs)
-        self.gpcincolnum = max([len(gpc['src']) for gpc in self.gpcs])
+        try:
+            self.gpcincolnum = max([len(gpc['src']) for gpc in self.gpcs])
+        except ValueError:
+            self.gpcincolnum = 0
         self.gpcinwidth = [len(gpc['src']) for gpc in self.gpcs]
         self.gpcin = [gpc['src'] for gpc in self.gpcs]
         self.gpcout = [gpc['dst'] for gpc in self.gpcs]

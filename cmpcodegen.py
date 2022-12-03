@@ -14,6 +14,8 @@ class compressor:
         self.stages = []
         self.instructions = []
         self.stagepos = []
+        self.tab = '    '
+        self.modulename = 'compressor'
 
     def parse(self):
         '''Recieves and parses circuit configuration from standard input.
@@ -165,8 +167,6 @@ class compressor:
         return True
 
     def codegen(self):
-        self.tab = '    '
-        self.modulename = 'compressor'
         return self.gen_module()
 
     def gen_module(self, tablevel=0):
@@ -317,7 +317,7 @@ class compressor:
         code += self.tab*(tablevel+1)+'initial begin\n'
         src = {i:[] for i in range(self.colmax)}
         for i in range(20):
-            code += self.tab*(tablevel+2)+f'#{i}\n'
+            code += self.tab*(tablevel+2)+'#10\n'
             for j, num in enumerate(self.stages[0]):
                 if num != 0:
                     rn = random.randint(0,(1<<num)-1)
@@ -388,8 +388,8 @@ def main():
     #simulator.dump()
     print(simulator.codegen())
     # if you do not need testmodule, just commentout the following lines.
-    #print(simulator.gen_implement_test())
-    print(simulator.gen_behavioral_test())
+    print(simulator.gen_implement_test())
+    #print(simulator.gen_behavioral_test())
 
 if __name__ == '__main__':
     main()
