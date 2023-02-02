@@ -2,6 +2,9 @@
 - CMPGEN(Compressor Generator)は、一般化並列カウンタ(Generalized Parallel Counter; GPC)を用いた多入力加算器(コンプレッサ)を効率的にFPGAに実装するためのツール群です。
 - IBM ILOG CPLEXを用いて、コンプレッサの最小化問題を解き、その結果をVerilog HDLのモジュールとして出力します。
 
+## SEE ALSO
+- GPCGEN: https://github.com/void-hoge/gpcgen
+  - このコンプレッサツリーで用いる一般化並列カウンタを自動生成するプロジェクトです。
 
 ## コンプレッサ
 - コンプレッサとは2進数整数の多入力加算器です。
@@ -35,7 +38,7 @@ $
 ## 実行例
 - 下の例は、32個の32bit整数を足し合わせるコンプレッサを構成し、GPCの実装と結合してiverilogで動作確認をしています。
 - `#`より右はコメントです。
-- また、simple_gpcs.vはiverlogなどで動作のテストを行うための、極めて単純な実装です。論理的には正しい動作をしますが、これをVivadoなどのツールで実装しても効率は低いです。
+- また、`simple_gpcs.v`はiverlogなどで動作のテストを行うための、極めて単純な実装です。論理的には正しい動作をしますが、これをVivadoなどのツールで実装しても効率は低いです。
 
 ```
 $ ./square.py gpclist.txt 32 2 5 | build/cmpgen --objective=none -o initial_solution.txt # コンプレッサ構成問題をソルバーに渡して初期解を計算
@@ -121,7 +124,7 @@ $
 - NxNの正方形の形に入力するコンプレッサの問題を生成します。
 - `./square.py <gpclist> <N> <stagemin> <stagemax>`
 - gpclistはGPCを論理的な形状を記述したファイル(gpclist.txt)です。
-- stageminは探索を開始するステージ数、stagemaxは探索を終了するステージ数です。
+- `stagemin`は探索を開始するステージ数、`stagemax`は探索を終了するステージ数です。
 #### popcounter.py
 - Nビットのポップカウンタ
 - `./popcounter.py <gpclist> <N> <stagemin> <stagemax>`
@@ -146,7 +149,7 @@ $
 - `--timelimit=<time>`で制限時間を設定できます。
 - 問題を入力した場合、それぞれのステージ数でこの制限時間が適用されます。
 #### 問題を入力した場合
-- stageminから始めてstagemaxまで探索を行い、1つ目の解を発見したら終了します。
+- `stagemin`から始めて`stagemax`まで探索を行い、1つ目の解を発見したら終了します。
 #### 解を入力した場合
 - 入力された解を初期解として最適化を行います。
 
@@ -155,7 +158,7 @@ $
 - ソルバーの解をパースし、変換します。
 - solution classはproblemを継承しています。
 #### solutionconv.py
-- 標準入力からcmpgenの出力を入力すると、cmpcodegen.pyで読み込める形式に変換し、標準出力に表示します。
+- 標準入力からcmpgenの出力を入力すると、`cmpcodegen.py`で読み込める形式に変換し、標準出力に表示します。
 - `cat solution.txt | solutionconv.py`
 #### margegpcs.py
 - ある解のGPCリストにGPCを追加します。
@@ -174,12 +177,12 @@ $
 - 入力をパースした結果から回路をシミュレーションしてテストを行える。その結果は標準エラー出力に表示されます。
 
 ## バグ検出
-- このプロジェクトはcmpcodegen.pyとその出力モジュールの2箇所でテストを行えます。
+- このプロジェクトは`cmpcodegen.py`とその出力モジュールの2箇所でテストを行えます。
 ### cmpcodegen.pyのテストが通らないとき
 - コンプレッサーのモデル(解)と、`cmpcodegen.py`でパースされるモデルが食い違っている可能性が高いです。
 ### behavioral_testが通らないとき
 - 出力されたモジュールによる和が異なるとき、GPCの実装かコードジェネレータにバグを含んでいます。
-- simple_gpcs.vのような可能な限りシンプルなGPCの実装をコンプレッサに結合してテストすることで、GPCの実装のバグかどうかが分かるはずです。
+- `simple_gpcs.v`のような可能な限りシンプルなGPCの実装をコンプレッサに結合してテストすることで、GPCの実装のバグかどうかが分かるはずです。
 
 ## Author
 - Mugi Noda(void-hoge)
