@@ -41,55 +41,66 @@ $
 - また、`simple_gpcs.v`はiverlogなどで動作のテストを行うための、極めて単純な実装です。論理的には正しい動作をしますが、これをVivadoなどのツールで実装しても効率は低いです。
 
 ```
-$ ./square.py gpclist.txt 32 2 5 | build/cmpgen --objective=none -o initial_solution.txt # コンプレッサ構成問題をソルバーに渡して初期解を計算
+$ ./square.py gpclist.txt 32 2 5 | build/cmpgen --objective=none -o initial32.txt # コンプレッサ構成問題をソルバーに渡して実行可能解を計算
 ...
-$ build/cmpgen initial_solution.txt --objective=mincost --timelimit=120 -o optimized_solution.txt # 初期解を120秒掛けて最適化
+$ build/cmpgen initial32.txt --objective=mincost --timelimit=120 -o optimized32.txt # 初期解を120秒かけて最適化
 ...
-$ ./solutionconv.py < optimized_solution.txt | ./cmpcodegen.py > comp32.v # 解を変換してテスト(correctが入力、simulateが出力)、verilogを出力
-correct: 61097481087, simulate: 61097481087
-correct: 65246360341, simulate: 65246360341
-correct: 59502265228, simulate: 59502265228
-correct: 61091934663, simulate: 61091934663
-correct: 71032078428, simulate: 71032078428
-correct: 74103422503, simulate: 74103422503
-correct: 67705343742, simulate: 67705343742
-correct: 66031894880, simulate: 66031894880
-correct: 64895608538, simulate: 64895608538
-correct: 73261521590, simulate: 73261521590
-correct: 58659332956, simulate: 58659332956
-correct: 69781284720, simulate: 69781284720
-correct: 61290858103, simulate: 61290858103
-correct: 77008920417, simulate: 77008920417
-correct: 73542555034, simulate: 73542555034
-correct: 70093789785, simulate: 70093789785
-correct: 81696337662, simulate: 81696337662
-correct: 63219576915, simulate: 63219576915
-correct: 60868091025, simulate: 60868091025
-correct: 67001723076, simulate: 67001723076
+$ ./cmpsim.py < optimized32.txt # シミュレータでランダムテスト
+src: 0x11317f53cd, dst: 0x11317f53cd
+src: 0x101fda15a8, dst: 0x101fda15a8
+src: 0x12407105ce, dst: 0x12407105ce
+src: 0x11c2e79555, dst: 0x11c2e79555
+src: 0x12225bd5f9, dst: 0x12225bd5f9
+src: 0x120cb2c4e1, dst: 0x120cb2c4e1
+src: 0x1105e975ad, dst: 0x1105e975ad
+src: 0x0f89accc3c, dst: 0x0f89accc3c
+src: 0x0e6779bae5, dst: 0x0e6779bae5
+src: 0x119dc3c823, dst: 0x119dc3c823
+src: 0x103200ad0f, dst: 0x103200ad0f
+src: 0x10786c8dd6, dst: 0x10786c8dd6
+src: 0x0e7c9ec11c, dst: 0x0e7c9ec11c
+src: 0x0d7aa31b3c, dst: 0x0d7aa31b3c
+src: 0x0bc39e506f, dst: 0x0bc39e506f
+src: 0x0d76ed9cdb, dst: 0x0d76ed9cdb
+src: 0x11ce17302d, dst: 0x11ce17302d
+src: 0x109cc82d17, dst: 0x109cc82d17
+src: 0x10775084a4, dst: 0x10775084a4
+src: 0x119cd04b57, dst: 0x119cd04b57
 PASS
-$ cat simple_gpcs.v >> comp32.v # GPCの実装と結合
-$ iverilog comp32.v -o comp32 # iverilogでコンパイル
-$ ./comp32 # テストを実行(左側が入力、右側が出力)
-0ec1c8176b => 0ec1c8176b
-0fa56ea05f => 0fa56ea05f
-1224ad0f7e => 1224ad0f7e
-0f01d827a9 => 0f01d827a9
-0df8a639ed => 0df8a639ed
-0ebd33db94 => 0ebd33db94
-0fe822bcc6 => 0fe822bcc6
-1012d35a5d => 1012d35a5d
-126f381892 => 126f381892
-0f31e74610 => 0f31e74610
-10a2039f1b => 10a2039f1b
-1100fef234 => 1100fef234
-1019f2fe9e => 1019f2fe9e
-0e9b62a156 => 0e9b62a156
-1044e25f0c => 1044e25f0c
-0ee7245025 => 0ee7245025
-0e4518d1bd => 0e4518d1bd
-0e8b2108c8 => 0e8b2108c8
-0f41caa576 => 0f41caa576
-12c262d4db => 12c262d4db
+$ ./cmpcodegen.py < optimized32.txt > comp32.v # メインのコンプレッサモジュール(compressor)と、動作テストモジュール(behavioral_tester)を生成
+$ iverilog comp32.v simple_gpcs.v -s behavioral_tester -o comp32 # 単純なGPCの記述とリンクしてコンパイル
+$ ./comp32 # シミュレーション (test = (src==dst))
+src: 0x0000000000, dst: 0x0000000000, test: 1
+src: 0x1fffffffe0, dst: 0x1fffffffe0, test: 1
+src: 0x0e39b1937f, dst: 0x0e39b1937f, test: 1
+src: 0x0f2cc66d8f, dst: 0x0f2cc66d8f, test: 1
+src: 0x0f90734560, dst: 0x0f90734560, test: 1
+src: 0x11f1d93b44, dst: 0x11f1d93b44, test: 1
+src: 0x100a99394b, dst: 0x100a99394b, test: 1
+src: 0x137e34bd84, dst: 0x137e34bd84, test: 1
+src: 0x0e787840d5, dst: 0x0e787840d5, test: 1
+src: 0x125b0e1c5e, dst: 0x125b0e1c5e, test: 1
+src: 0x0fcfd7f39e, dst: 0x0fcfd7f39e, test: 1
+src: 0x0c54fd597d, dst: 0x0c54fd597d, test: 1
+$ ./pipelined_cmpcodegen.py < optimized32.txt > pipelined_comp32.v # パイプライン化バージョン
+$ iverilog pipelined_comp32.v simple_gpcs.v -s behavioral_tester -o pipelined_comp32
+$ ./pipelined_comp32 # シミュレーション testはステージ数分戻ったsrcと等しいかどうか
+src: 0xxxxxxxxxxx, dst: 0xxxxxxxxxxx, test: x
+src: 0x0000000000, dst: 0xxxxxxxxxxx, test: x
+src: 0x1fffffffe0, dst: 0xxxxxxxxxxx, test: x
+src: 0x0e39b1937f, dst: 0xxxxxxxxxxx, test: x
+src: 0x0f2cc66d8f, dst: 0x0000000000, test: 1
+src: 0x0f90734560, dst: 0x1fffffffe0, test: 1
+src: 0x11f1d93b44, dst: 0x0e39b1937f, test: 1
+src: 0x100a99394b, dst: 0x0f2cc66d8f, test: 1
+src: 0x137e34bd84, dst: 0x0f90734560, test: 1
+src: 0x0e787840d5, dst: 0x11f1d93b44, test: 1
+src: 0x125b0e1c5e, dst: 0x100a99394b, test: 1
+src: 0x0fcfd7f39e, dst: 0x137e34bd84, test: 1
+src: 0x0c54fd597d, dst: 0x0e787840d5, test: 1
+src: 0x0c54fd597d, dst: 0x125b0e1c5e, test: 1
+src: 0x0c54fd597d, dst: 0x0fcfd7f39e, test: 1
+src: 0x0c54fd597d, dst: 0x0c54fd597d, test: 1
 $
 ```
 
@@ -154,33 +165,60 @@ $
 - 入力された解を初期解として最適化を行います。
 
 
-### Solution Parser/Converter
-- ソルバーの解をパースし、変換します。
-- solution classはproblemを継承しています。
-#### solutionconv.py
-- 標準入力からcmpgenの出力を入力すると、`cmpcodegen.py`で読み込める形式に変換し、標準出力に表示します。
-- `cat solution.txt | solutionconv.py`
-#### margegpcs.py
+### mergegpcs.py
 - ある解のGPCリストにGPCを追加します。
 - これの出力をさらに`cmpgen`に入力して最適化を行えます。
 - 結果は標準出力に表示されます。
-- `./margegpcs.py <solution> <gpclist_added>`
+- `./mergegpcs.py <solution file> <gpclist_added>`
 - もとのGPCリストは、`<gpclist_added>`のサブセットである必要があります。
-- `<solution>`は、`solutionconv.py`で変換したものではなく、`cmpgen`で出力される解です。
+- `<solution>`は、`cmpgen`で出力される解です。
 
+
+### Simulator
+#### cmpsim.py
+- 標準入力から得られた解を元に、回路をシミュレーションしてその結果を標準出力に表示します。
+- 解に含まれる不要なGPC(1;1)を削除する機能も持ちます。(`cmpsim.remove_unnecessary_wires()`)
+- `cmpsim.randomtest`の引数の`iteration`に回数を与えることで、テスト回数を変更できます。
+- `cat <solution file> | ./cmpsim.py`
 
 ### Code Generator
+- コンプレッサツリーのVerilog HDLによる実装と、そのテストベンチを出力します。
+- テストベンチには全てのビットに0を入力した場合と1を入力した場合が含まれます。
+
 #### cmpcodegen.py
-- `solutionconv.py`の出力を標準入力に入力し、コンプレッサのVerilog moduleを標準出力に出力します。
-- `compressor.gen_behavioral_test()`で、動作テスト用のモジュールを出力します。
-- `compressor.gen_implement_test()`で、シフトレジスタを用いた実装テスト用のモジュールを出力できます。(正方形の入力のみ対応)
-- 入力をパースした結果から回路をシミュレーションしてテストを行える。その結果は標準エラー出力に表示されます。
+- 解を標準入力に入力し、Verilog HDLのコンプレッサモジュール(`compressor`)と、そのテストベンチ(`behavioral_tester`)を出力します。
+- `cat <solution file> | ./cmpcodegen.py`
+
+#### pipelined_cmpcodegen.py
+- `cmpcodegen.py`のパイプライン化バージョンです。
+- 解のステージごとにレジスタを挿入してパイプライン化を行います。
+- n段ごとにパイプラインすることもできるはずですが、実装していません。
+- `cat <solution file> | ./pipelined_cmpcodegen.py`
+- 入出力段を含めて5段のコンプレッサツリーのパイプラインレジスタの構造は以下のようになっています。
+- 番号が同じ`stage wire`と`pipeline regs`は同じビット数です。
+```
+stage wire 0 <- src
+gpc stage 0
+stage wire 1
+---clk---
+pipeline regs 1
+gpc stage 1
+stage wire 2
+---clk---
+pipeline regs 2
+gpc stage 2
+stage wire 3
+---clk---
+pipeline regs 3
+gpc stage 3
+stage wire 4 -> dst
+```
 
 ## バグ検出
-- このプロジェクトは`cmpcodegen.py`とその出力モジュールの2箇所でテストを行えます。
-### cmpcodegen.pyのテストが通らないとき
-- コンプレッサーのモデル(解)と、`cmpcodegen.py`でパースされるモデルが食い違っている可能性が高いです。
-### behavioral_testが通らないとき
+- このプロジェクトは`cmpsm.py`と`cmpcodegen.py`の出力モジュールの2箇所でテストを行えます。
+### cmpsim.pyのテストが通らないとき
+- コンプレッサツリーの定式化に誤りがある可能性と、`cmpsim.py`が誤っている可能性があります。
+### behavioral_testerの出力が通らないとき
 - 出力されたモジュールによる和が異なるとき、GPCの実装かコードジェネレータにバグを含んでいます。
 - `simple_gpcs.v`のような可能な限りシンプルなGPCの実装をコンプレッサに結合してテストすることで、GPCの実装のバグかどうかが分かるはずです。
 

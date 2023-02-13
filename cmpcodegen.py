@@ -1,241 +1,252 @@
 #!/usr/bin/env python3
 
-import sys
-import re
+import math
 import random
-import copy
 from cmpsim import cmpsim
 
 class cmpcodegen(cmpsim):
-    def __init__(self):
-        super().__init__()
-        self.parse()
-        self.build()
-        self.tab = '    '
+    def __init__(self, rawtxt):
+        super().__init__(rawtxt)
+        self.tab = '   '
         self.modulename = 'compressor'
 
+    def gen_vars(self):
+        self.maxdigit = int(math.log10(self.colnum)+1)
+        self.srcwires = {col:(f'src{str(col).zfill(self.maxdigit)}', num)
+                         for col, num in enumerate(self.initialstage) if num > 0}
+        self.dstwires = {col:(f'dst{str(col).zfill(self.maxdigit)}', num)
+                         for col, num in enumerate(self.stages[-1]) if num > 0}
+        self.stagewires = {col: (f'stage{str(col).zfill(self.maxdigit)}', num)
+                           for col, num in enumerate(self.stagepos[-1]) if num > 0}
+
     def codegen(self):
+        self.gen_vars()
         return self.gen_module()
 
     def gen_module(self, tablevel=0):
-        '''Generates Verilog code of the compressor module.
-        '''
-        # beginning of the module
         code = ''
         code += self.tab*tablevel + f'module {self.modulename}(\n'
-        # argument wires: inputs and outputs wires
+
         argwires = []
-        for i, num in enumerate(self.stages[0]):
-            if num != 0:
-                argwires.append(self.tab*(tablevel+1)+f'input wire [{num-1}:0] src{i}')
-        for i, num in enumerate(self.stages[-1]):
-            if num != 0:
-                argwires.append(self.tab*(tablevel+1)+f'output wire [{num-1}:0] dst{i}')
-        code += ',\n'.join(argwires)+');\n'
+        for c, (name, length) in self.srcwires.items():
+            argwires.append(f'input wire [{length-1}:0] {name}')
+        for c, (name, length) in self.dstwires.items():
+            argwires.append(f'output wire [{length-1}:0] {name}')
 
-        # calls code generation functions for other parts.
-        code += self.gen_declaration(tablevel+1)
-        code += self.gen_assign_src(tablevel+1)
-        code += self.gen_assign_dst(tablevel+1)
-        code += self.gen_gpc_instantiations(tablevel+1)
+        code += self.tab*(tablevel+2)
+        code += f',\n{self.tab*(tablevel+2)}'.join(argwires)
+        code += f'\n{self.tab*(tablevel+1)});\n'
 
-        # end of module
-        code += 'endmodule\n'
+        code += self.gen_stagewire_declarations(tablevel+1)
+        code += self.gen_srcwire_assignments(tablevel+1)
+        code += self.gen_dststage_assignments(tablevel+1)
+        code += self.gen_gpc_instantiation(tablevel+1)
+        
+        code += self.tab*tablevel + 'endmodule\n'
         return code
 
-    def gen_declaration(self, tablevel):
-        '''Generates declaration of wires.
-        '''
+    def gen_stagewire_declarations(self, tablevel):
         code = ''
-        for i, num in enumerate(self.wirelen):
-            if num != 0:
-                code += self.tab*tablevel + f'wire [{num-1}:0] s{i};\n'
+        for c, (name, length) in self.stagewires.items():
+            code += self.tab*tablevel + f'wire [{length-1}:0] {name};\n'
         return code
 
-    def gen_assign_src(self, tablevel):
-        '''Generates assignment of initial values of wires.
-        '''
+    def gen_srcwire_assignments(self, tablevel):
         code = ''
-        for i, num in enumerate(self.stages[0]):
-            if num != 0:
-                code += self.tab*tablevel + f'assign s{i}[{num-1}:0] = src{i};\n'
-        return code
-    
-    def gen_assign_dst(self, tablevel):
-        '''Generates assignment of dst.
-        '''
-        code = ''
-        for i, (start, height) in enumerate(zip(self.stagepos[-1], self.stages[-1])):
-            if height != 0:
-                end = start+height-1
-                code += self.tab*tablevel + f'assign dst{i} = s{i}[{end}:{start}];\n'
+        for col, (srcname, srclen) in self.srcwires.items():
+            stagename, _ = self.stagewires[col]
+            code += self.tab*tablevel + f'assign {stagename}[{srclen-1}:0] = {srcname};\n'
         return code
 
-    def gen_gpc_instantiations(self, tablevel):
-        '''Generates instantiation of GPCs from the self.instructions.
-        '''
+    def gen_dststage_assignments(self, tablevel):
         code = ''
-        for i, inst in enumerate(self.instructions):
-            src = inst['src']
-            dst = inst['dst']
-            gpc = inst['gpc']
-            gpcname = f'gpc{"".join([str(num) for num in gpc["src"].values()][::-1])}'
-            gpcname += f'_{gpc["dst"]}'
-            code += self.tab*tablevel
-            code += f'{gpcname} {gpcname}_{i}(\n'
-            args = []
-            initial_place = min([place for place, wires in dst.items() if wires])
-            for p, gpcnum in gpc['src'].items():
-                if gpcnum == 0:
-                    continue
-                wires = []
-                place = initial_place+p
-                if place >= self.colmax:
-                    wires.append(f'{gpcnum}\'h0')
-                else:
-                    srcnums = src[place]
-                    for idx in srcnums:
-                        wires.append(f's{place}[{idx}]')
-                    if len(srcnums) < gpcnum:
-                        wires.append(f'{gpcnum-len(srcnums)}\'h0')
-                args.append(f'{{{", ".join(wires)}}}')
-            wires = []
-            for place, nums in dst.items():
-                if nums == []:
-                    continue
-                else:
-                    wires.append(f's{place}[{nums[0]}]')
-            args.append(f'{{{", ".join(wires[::-1])}}}')
+        for col, (begin, end) in enumerate(zip(self.stagepos[-2], self.stagepos[-1])):
+            dstname, _ = self.dstwires[col]
+            stagename, _ = self.stagewires[col]
+            code += self.tab*tablevel + f'assign {dstname} = {stagename}[{end-1}:{begin}];\n'
+        return code
+
+    def get_gpcname(self, gpcin, gpcout):
+        return f'gpc{"".join(map(str, gpcin[::-1]))}_{gpcout}'
+
+    def get_gpcsrc(self, gpcsrc):
+        src = []
+        for wires in gpcsrc:
+            if wires:
+                wireband = []
+                for wire in wires:
+                    if wire is None:
+                        wireband.append('1\'h0')
+                    else:
+                        place = wire['place']
+                        pos = wire['pos']
+                        name, length = self.stagewires[place]
+                        wireband.append(f'{name}[{pos}]')
+                src.append(f'{{{", ".join(wireband)}}}')
+        return src
+
+    def get_gpcdst(self, gpcdst):
+        dst = []
+        for wire in gpcdst:
+            if wire is None:
+                break
+            place = wire['place']
+            pos = wire['pos']
+            name, length = self.stagewires[place]
+            dst.append(f'{name}[{pos}]')
+        return f'{{{", ".join(dst[::-1])}}}'
+
+    def gen_gpc_instantiation(self, tablevel):
+        code = ''
+        for idx, inst in enumerate(self.instructions):
+            gpcin = inst['gpcin']
+            gpcout = inst['gpcout']
+            srcwires = inst['src']
+            dstwires = inst['dst']
+            gpcname = self.get_gpcname(gpcin, gpcout)
+            code += self.tab*tablevel + f'{gpcname} {gpcname}_{idx}(\n'
             code += self.tab*(tablevel+1)
-            code += f',\n{self.tab*(tablevel+1)}'.join(args)
-            code += '\n'
-            code += self.tab*tablevel
-            code += ');\n'
+            argwires = self.get_gpcsrc(srcwires)
+            argwires.append(self.get_gpcdst(dstwires))
+            code += f',\n{self.tab*(tablevel+1)}'.join(argwires)
+            code += f'\n{self.tab*tablevel});\n'
         return code
 
-    def gen_behavioral_test(self, tablevel=0):
-        '''Generates a behavioral test module
-        '''
+class cmpbehavioraltestgen(cmpcodegen):
+    def __init__(self, rawtxt):
+        super().__init__(rawtxt)
+        self.testmodulename = 'behavioral_tester'
+
+    def gen_vars(self):
+        super().gen_vars()
+        self.testsrcregs = self.srcwires
+        self.testdstwires = self.dstwires
+        self.sumlen = self.colnum + math.ceil(math.log2(self.finalstage))
+        self.srcsum = ('srcsum', self.sumlen)
+        self.dstsum = ('dstsum', self.sumlen)
+        self.testwire = 'test'
+        self.cmpinstname = 'main_cmp'
+
+    def codegen(self):
+        self.gen_vars()
+        return self.gen_module()
+
+    def gen_module(self, tablevel=0):
         code = ''
-        # beginning of module
-        code += self.tab*tablevel+f'module behavioral_tester(output wire[{self.colmax}:0] out);\n'
-        # module arguments: compressor argument list
-        modargs = []
-        # input register declaration
-        for i, num in enumerate(self.stages[0]):
-            if num != 0:
-                code += self.tab*(tablevel+1)+f'reg [{num-1}:0] src{i};\n'
-                modargs.append(f'src{i}')
-        # output wire declaration
-        for i, num in enumerate(self.stages[-1]):
-            if num != 0:
-                code += self.tab*(tablevel+1)+f'wire [{num-1}:0] dst{i};\n'
-                modargs.append(f'dst{i}')
-        # sum of inputs(for test)
-        code += self.tab*(tablevel+1)+f'wire [{self.colmax}:0] srcsum;\n'
-        # sum of outputs(for test)
-        code += self.tab*(tablevel+1)+f'wire [{self.colmax}:0] dstsum;\n'
-        code += self.tab*(tablevel+1)+f'assign out = dstsum;\n'
-        # assign sum of inputs
-        code += self.tab*(tablevel+1)+'assign srcsum = '
-        srcwires = []
-        for i, num in enumerate(self.stages[0]):
-            if num != 0:
-                for j in range(num):
-                    srcwires.append(f'(src{i}[{j}]<<{i})')
-        code += f'\n{self.tab*(tablevel+2)} + '.join(srcwires)+';\n'
-        # assign sum of outputs
-        code += self.tab*(tablevel+1)+'assign dstsum = '
-        dstwires = []
-        for i, num in enumerate(self.stages[-1]):
-            if num != 0:
-                for j in range(num):
-                    dstwires.append(f'(dst{i}[{j}]<<{i})')
-        code += f'\n{self.tab*(tablevel+2)} + '.join(dstwires)+';\n'
+        code += self.tab*tablevel + f'module {self.testmodulename}();\n'
 
-        # compressor instantation
-        code += self.tab*(tablevel+1)+f'{self.modulename} main_cmp({", ".join(modargs)});\n'
+        code += self.gen_srcreg_declarations(tablevel+1)
+        code += self.gen_dstwire_declarations(tablevel+1)
+        code += self.gen_testwire_declarations(tablevel+1)
+        code += self.gen_srcsum_assignment(tablevel+1)
+        code += self.gen_dstsum_assignment(tablevel+1)
+        code += self.gen_compressor_instantiation(tablevel+1)
+        code += self.gen_testwire_assignment(tablevel+1)
+        code += self.gen_monitor_block(tablevel+1)
+        code += self.gen_test_sequence_block(tablevel+1)
 
-        # configuring wire monitoring
-        code += self.tab*(tablevel+1)+'initial begin\n'
-        code += self.tab*(tablevel+2)+'$monitor("%x => %x", srcsum, dstsum);\n'
-        code += self.tab*(tablevel+1)+'end\n'
-
-        # signal generation for testing
-        code += self.tab*(tablevel+1)+'initial begin\n'
-        src = {i:[] for i in range(self.colmax)}
-        for i in range(20):
-            code += self.tab*(tablevel+2)+'#10\n'
-            for j, num in enumerate(self.stages[0]):
-                if num != 0:
-                    rn = random.randint(0,(1<<num)-1)
-                    src[j] = self.getbinlist(rn, num)
-                    code += self.tab*(tablevel+2)+f'src{j}<={num}\'h{rn:x};\n'
-            srctot = 0
-            for i in range(self.colmax):
-                srctot += sum(src[i])<<i
-                dst = self.simulate(src)
-                dsttot = 0
-            for i in range(self.colmax):
-                dsttot += sum(dst[i])<<i
-        code += self.tab*(tablevel+1)+'end\n'
-
-        # end of module
-        code += self.tab*tablevel+'endmodule\n'
+        code += self.tab*tablevel + 'endmodule\n'
         return code
 
-    def gen_implement_test(self, tablevel=0):
-        '''Generate a implement test moudle using shift registers.
-        This module only supports N by N square inputs.
-        '''
+    def gen_srcreg_declarations(self, tablevel):
         code = ''
-        code += self.tab*tablevel+f'module implment_tester(input wire clk,\n'
-        N = self.stages[0][0]
-        code += self.tab*(tablevel+2)+f'input wire [{N-1}:0]src,\n'
-        code += self.tab*(tablevel+2)+f'output wire[{self.colmax-1}:0] dstfirst, dstsecond);\n'
-        modargs = []
-        for i in range(N):
-            code += self.tab*(tablevel+1)+f'reg [{N-1}:0] src{i};\n'
-            modargs.append(f'src{i}')
-        for i in range(self.colmax):
-            code += self.tab*(tablevel+1)+f'wire [1:0] dst{i};\n'
-            modargs.append(f'dst{i}')
-        dstfirst = [f'dst{i}[0]' for i in range(self.colmax)]
-        dstsecond = [f'dst{i}[1]' for i in range(self.colmax)]
-        code += self.tab*(tablevel+1)+\
-            f'assign dstfirst = {{{", ".join(dstfirst)}}};\n'
-        code += self.tab*(tablevel+1)+\
-            f'assign dstsecond = {{{", ".join(dstsecond)}}};\n'
-        code += self.tab*(tablevel+1)+f'{self.modulename} main_cmp({", ".join(modargs)});\n'
-        
-        code += self.tab*(tablevel+1)+f'initial begin\n'
-        for i in range(N):
-            code += self.tab*(tablevel+2)+f'src{i} = 0;\n'
-        code += self.tab*(tablevel+1)+f'end\n'
+        for col, (name, length) in self.testsrcregs.items():
+            code += self.tab*tablevel + f'reg [{length-1}:0] {name};\n'
+        return code
 
-        code += self.tab*(tablevel+1)+'integer i;\n'
-        code += self.tab*(tablevel+1)+'always @(posedge clk) begin\n'
-        for i in range(N):
-            code += self.tab*(tablevel+2)+f'src{i}[0] <= src[{i}];\n'
-        code += self.tab*(tablevel+2)+f'for (i = {N}; i > 0; i = i-1) begin\n'
-        for i in range(N):
-            code += self.tab*(tablevel+3)+f'src{i}[i] <= src{i}[i-1];\n'
-        code += self.tab*(tablevel+2)+f'end\n'
-        
-        code += self.tab*(tablevel+1)+'end\n'
-        
-        code += self.tab*tablevel+f'endmodule\n'
+    def gen_dstwire_declarations(self, tablevel):
+        code = ''
+        for col, (name, length) in self.testdstwires.items():
+            code += self.tab*tablevel + f'wire [{length-1}:0] {name};\n'
+        return code
+
+    def gen_testwire_declarations(self, tablevel):
+        code = ''
+        srcname, srclen = self.srcsum
+        code += self.tab*tablevel + f'wire [{srclen-1}:0] {srcname};\n'
+        dstname, dstlen = self.dstsum
+        code += self.tab*tablevel + f'wire [{dstlen-1}:0] {dstname};\n'
+        code += self.tab*tablevel + f'wire {self.testwire};\n'        
+        return code
+
+    def gen_srcsum_assignment(self, tablevel):
+        code = ''
+        name, _ = self.srcsum
+        code += self.tab*tablevel + f'assign {name} =\n'
+        terms = []
+        for col, (name, length) in self.testsrcregs.items():
+            for i in range(length):
+                terms.append(f'({name}[{i}] << {col})')
+        code += self.tab*(tablevel+1)
+        code += f' +\n{self.tab*(tablevel+1)}'.join(terms)
+        code += ';\n'
+        return code
+
+    def gen_dstsum_assignment(self, tablevel):
+        code = ''
+        name, _ = self.dstsum
+        code += self.tab*tablevel + f'assign {name} =\n'
+        terms = []
+        for col, (name, length) in self.testdstwires.items():
+            for i in range(length):
+                terms.append(f'({name}[{i}] << {col})')
+        code += self.tab*(tablevel+1)
+        code += f' +\n{self.tab*(tablevel+1)}'.join(terms)
+        code += ';\n'
+        return code
+
+    def gen_testwire_assignment(self, tablevel):
+        code = ''
+        code += self.tab*tablevel + f'assign {self.testwire} = {self.srcsum[0]} == {self.dstsum[0]};\n'
+        return code
+
+    def gen_compressor_instantiation(self, tablevel):
+        code = ''
+        code += self.tab*tablevel + f'{self.modulename} {self.cmpinstname}('
+        args = []
+        for col, (name, length) in self.testsrcregs.items():
+            args.append(name)
+        for col, (name, length) in self.testdstwires.items():
+            args.append(name)
+        code += ', '.join(args)
+        code += ');\n'
+        return code
+
+    def gen_monitor_block(self, tablevel):
+        code = ''
+        code += self.tab*tablevel + 'initial begin\n'
+        code += self.tab*(tablevel+1) + f'$monitor(\"src: 0x%x, dst: 0x%x, test: %b\", {self.srcsum[0]}, {self.dstsum[0]}, {self.testwire});\n'
+        code += self.tab*tablevel + 'end\n'
+        return code
+
+    def gen_test_sequence_block(self, tablevel, iteration=10):
+        code = ''
+        code += self.tab*tablevel + 'initial begin\n'
+        for col, (name, length) in self.testsrcregs.items():
+            code += self.tab*(tablevel+1) + f'{name} <= {length}\'h{0:x};\n'
+        code += self.tab*(tablevel+1) + '#1\n'
+        for col, (name, length) in self.testsrcregs.items():
+            code += self.tab*(tablevel+1) + f'{name} <= {length}\'h{(1<<length)-1:x};\n'
+
+        for _ in range(iteration):
+            code += self.tab*(tablevel+1) + '#1\n'
+            for col, (name, length) in self.testsrcregs.items():
+                code += self.tab*(tablevel+1) + f'{name} <= {length}\'h{random.randint(0, (1<<length)-1):x};\n'
+        code += self.tab*tablevel + 'end\n'
         return code
 
 def main():
     random.seed(a=0)
-    codegen = cmpcodegen()
-    print('PASS' if codegen.randomtest(20) else 'FAIL', file=sys.stderr)
-    #simulator.dump()
+    rawtxt = ''
+    while True:
+        try:
+            rawtxt += input() + '\n'
+        except EOFError:
+            break
+    codegen = cmpcodegen(rawtxt)
+    testgen = cmpbehavioraltestgen(rawtxt)
     print(codegen.codegen())
-    # if you do not need testmodule, just commentout the following lines.
-    #print(codegen.gen_implement_test())
-    print(codegen.gen_behavioral_test())
+    print(testgen.codegen())
 
 if __name__ == '__main__':
     main()

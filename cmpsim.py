@@ -1,165 +1,159 @@
 #!/usr/bin/env python3
 
-import sys
-import re
 import random
-import copy
+from copy import copy
+from solution import solution
 
-class cmpsim:
-    def __init__(self):
-        self.stagemax = 0
-        self.colmax = 0
-        self.gpcs = []
-        self.wirelen = []
-        self.stages = []
-        self.instructions = []
-        self.stagepos = []
-
-    def parse(self):
-        '''Recieves and parses circuit configuration from standard input.
-        Circuit configuration is standard output of cmpgen.
-        '''
-        tmp = input()
-        m = re.search(r'STAGENUM: ([0-9]+)', tmp)
-        self.stagemax = int(m.group(1))
-        self.gpcs = [[] for _ in range(self.stagemax-1)]
-        self.stages = [[] for _ in range(self.stagemax)]
-        tmp = input()
-        m = re.search(r'COLNUM: ([0-9]+)', tmp)
-        self.colmax = int(m.group(1))
-        for i in range(self.stagemax):
-            tmp = input()
-            m = re.search(r'stage {}: (.+)'.format(i), tmp)
-            self.stages[i] = list(list(map(int, m.group(1).split())))
-        self.stagepos = [[0 for _ in range(self.colmax)]
-                         for _ in range(self.stagemax)]
-        for i in range(self.stagemax):
-            for j in range(self.colmax):
-                self.stagepos[i][j] = sum([self.stages[k][j]
-                                           for k in range(i)])
-        self.wirelen = [sum([self.stages[i][j] for i in range(self.stagemax)])
-                        for j in range(self.colmax)]
-        for i in range(self.stagemax-1):
-            tmp = input()
-            m = re.search(r'stage {} -> {}: ([0-9]+)'.format(i, i+1), tmp)
-            src = i
-            dst = i+1
-            count = int(m.group(1))
-            for j in range(count):
-                tmp = input()
-                m = re.search(r' +\(col: ([0-9]+), num: ([0-9]+), GPC(.+)\)', tmp)
-                col = int(m.group(1))
-                num = int(m.group(2))
-                gpc = m.group(3)
-                m = re.search(r'\((.+);([0-9]+)\)', gpc)
-                src = {i:int(numstr) for i, numstr in
-                       enumerate(m.group(1).split(',')[::-1])}
-                dst = int(m.group(2))
-                self.gpcs[i].append({'col':col, 'num':num, 'src':src, 'dst':dst})
-
-    def dump(self, ost=sys.stderr):
-        for inst in self.instructions:
-            src = inst['src']
-            dst = inst['dst']
-            gpc = inst['gpc']
-            print(f'({",".join(map(str,list(gpc["src"].values())[::-1]))};{gpc["dst"]})',
-                  file=ost)
-            print('    src', file=ost)
-            for i, nums in src.items():
-                if nums != []:
-                    print(f'        {i}: {nums}', file=ost)
-            print('    dst', file=ost)
-            for i, nums in dst.items():
-                if nums != []:
-                    print(f'        {i}: {nums}', file=ost)
+class cmpsim(solution):
+    def __init__(self, rawtxt):
+        super().__init__(rawtxt)
+        self.build()
 
     def build(self):
-        '''Generates a sequence of instructions from the parsed information.
-        The instructions stored in the self.instructions.
-        '''
-        for stg, gpcs in enumerate(self.gpcs):
-            srcpos = copy.deepcopy(self.stagepos[stg])
-            dstpos = copy.deepcopy(self.stagepos[stg+1])
-            for gpc in gpcs:
-                col, num, src, dst =\
-                    gpc['col'], gpc['num'], gpc['src'], gpc['dst']
-                for idx in range(num):
-                    srcwires = {i: [] for i in range(self.colmax)}
-                    dstwires = {i: [] for i in range(self.colmax)}
-                    for i, num in src.items():
-                        place = i+col
-                        if place >= self.colmax:
-                            break
-                        srcwires[place] = [srcpos[place]+j
-                                          for j in range(num)
-                                          if srcpos[place]+j <
-                                          self.stagepos[stg+1][place]]
-                        srcpos[place] += len(srcwires[place])
-                    for i in range(dst):
-                        if col+i >= self.colmax:
-                            break
-                        dstwires[col+i].append(dstpos[col+i])
-                        dstpos[col+i]+=1
-                    self.instructions.append({'src':srcwires, 'dst':dstwires,
-                                              'gpc':{'src':src, 'dst':dst}})
+        self.remove_unnecessary_wires()
+        self.build_stages()
+        self.build_gpcs()
 
-    def simulate(self, src):
-        '''Simulates the operation of the circuit from the generated instruction sequence and the SRC.
-        Returns the final stage of the compressor as the same format as as SRC.
-        '''
-        wire = [[0 for _ in range(self.wirelen[i])] for i in range(self.colmax)]
-        for i in range(self.colmax):
-            wire[i][0:len(src[i])] = src[i]
-        for inst in self.instructions:
-            gsrc = inst['src']
-            gdst = inst['dst']
-            total = 0
-            for i in range(self.colmax):
-                total += sum([wire[i][j] for j in gsrc[i]
-                              if j < self.wirelen[i]])<<i
-            dstbinlist = self.getbinlist(total, self.colmax)
-            for i in range(self.colmax):
-                if len(gdst[i]) != 0:
-                    pos = gdst[i][0]
-                    wire[i][pos] = dstbinlist[i]
-        dst = {i:[] for i in range(self.colmax)}
-        for i in range(self.colmax):
-            dst[i] = wire[i][self.wirelen[i]-self.stages[self.stagemax-1][i]:self.wirelen[i]]
-        return dst
+    def remove_unnecessary_wires(self):
+        currentstagebits = copy(self.initialstage)
+        for s, gpcstage in enumerate(self.gpcusage):
+            nextstagebits = [0 for _ in range(self.colnum)]
+            for c, gpccol in enumerate(gpcstage):
+                for g, gpcnum in enumerate(gpccol):
+                    if self.gpcout[g] == 1:
+                        continue
+                    for place, num in enumerate(self.gpcin[g]):
+                        try:
+                            currentstagebits[c + place] -= num*gpcnum
+                        except IndexError:
+                            pass
+                    for place in range(self.gpcout[g]):
+                        try:
+                            nextstagebits[c + place] += gpcnum
+                        except IndexError:
+                            pass
+            wireidx = self.gpcout.index(1)
+            for place, wirenum in enumerate(currentstagebits):
+                if wirenum > 0:
+                    nextstagebits[place] += wirenum
+                    self.gpcusage[s][place][wireidx] = wirenum
+                if wirenum <= 0:
+                    self.gpcusage[s][place][wireidx] = 0
+            currentstagebits = copy(nextstagebits)
+            self.stages[s+1] = copy(nextstagebits)
 
-    def getbinlist(self, num, width):
-        '''Returns binary list of NUM width of WIDTH.
-        '''
-        result = []
+    def build_stages(self):
+        self.stagepos = [[0 for _ in range(self.colnum)]
+                         for _ in range(self.stagemin+1)]
+        for s in range(self.stagemin):
+            for c in range(self.colnum):
+                self.stagepos[s+1][c] = \
+                    self.stagepos[s][c] + self.stages[s][c]
+
+    def build_gpcs(self):
+        self.instructions = []
+        for s, gpcstage in enumerate(self.gpcusage):
+            srcpos = copy(self.stagepos[s])
+            dstpos = copy(self.stagepos[s+1])
+            for c, gpccol in enumerate(gpcstage):
+                for g, gpcnum in enumerate(gpccol):
+                    for i in range(gpcnum):
+                        src = [[None for _ in range(self.gpcin[g][place])]
+                               for place in range(self.gpcinwidth[g])]
+                        for place in range(self.gpcinwidth[g]):
+                            if c+place >= self.colnum:
+                                continue
+                            maxheight = min(self.gpcin[g][place],
+                                            self.stagepos[s+1][c+place]-srcpos[c+place])
+                            for num in range(maxheight):
+                                src[place][num] = {
+                                    'place':c+place,
+                                    'pos':srcpos[c+place]+num
+                                }
+                            srcpos[c+place] += maxheight
+                        dst = [None for _ in range(self.gpcout[g])]
+                        for place in range(self.gpcout[g]):
+                            try:
+                                dst[place] = {
+                                    'place':c+place,
+                                    'pos':dstpos[c+place]
+                                }
+                                dstpos[c+place] += 1
+                            except IndexError:
+                                pass
+                        self.instructions.append({
+                            'gpcin': self.gpcin[g],
+                            'gpcout': self.gpcout[g],
+                            'src': src,
+                            'dst': dst,
+                        })
+
+    def int2bin(self, num, width):
+        rslt = [0 for _ in range(width)]
         for i in range(width):
-            if num&(1<<i)==0:
-                result.append(0)
-            else:
-                result.append(1)
-        return result
+            rslt[i] = (num>>i)&1
+        return rslt
 
-    def test(self):
-        '''Generates the first stage SRC of the compressor randomly and execute the self.simulate.
-        Returns a tuple of correct and simulated sum.
-        '''
-        src = {i:[] for i in range(self.colmax)}
-        srctotal = 0
-        for i in range(self.colmax):
-            num = random.randint(0, (1<<self.stages[0][i])-1)
-            src[i] = self.getbinlist(num, self.stages[0][i])
-            srctotal += sum(src[i])<<i
-        dst = self.simulate(src)
-        dsttotal = 0
-        for i in range(self.colmax):
-            dsttotal += sum(dst[i])<<i
-        return (srctotal, dsttotal)
+    def bin2int(self, bits):
+        return sum([bit<<p for p, bit in enumerate(bits)])
 
-    def randomtest(self, iteration):
-        '''Executes self.test() ITERATION times and returns True if the all CORRECT equal to simulated sum.
-        '''
-        for i in range(iteration):
-            correct, simulate = self.test()
-            print(f'correct: {correct}, simulate: {simulate}', file=sys.stderr)
-            if correct != simulate:
+    def gpcsim(self, srcbits, outwidth):
+        num = 0
+        for place, bits in srcbits.items():
+            num += sum(bits) << place
+        return self.int2bin(num, outwidth)
+
+    def simulate(self, srcbits):
+        stagebits = {c:[0 for _ in range(self.stagepos[-1][c])]
+                     for c in range(self.colnum)}
+        for col in range(self.colnum):
+            stagebits[col][0:self.initialstage[col]] = srcbits[col]
+        for inst in self.instructions:
+            gpcsrcbits = {c: [0 for _ in range(num)]
+                          for c, num in enumerate(inst['gpcin'])}
+            for c, bits in enumerate(inst['src']):
+                for idx, bit in enumerate(bits):
+                    if bit == None:
+                        continue
+                    place, pos = bit['place'], bit['pos']
+                    gpcsrcbits[c][idx] = stagebits[place][pos]
+            gpcdstbits = self.gpcsim(gpcsrcbits, inst['gpcout'])
+            for c, bit in enumerate(inst['dst']):
+                if bit == None:
+                    continue
+                place, pos = bit['place'], bit['pos']
+                try:
+                    stagebits[place][pos] = gpcdstbits[c]
+                except IndexError:
+                    pass
+        return {c: stagebits[c][self.stagepos[-2][c]:self.stagepos[-1][c]] for c in range(self.colnum)}
+
+    def randomtest(self, iteration=20):
+        for _ in range(iteration):
+            srcbits = {col: [random.randint(0,1)
+                             for i in range(self.initialstage[col])]
+                       for col in range(self.colnum)}
+            srcsum = sum([sum(colbits)<<place for place, colbits in srcbits.items()])
+            dstbits = self.simulate(srcbits)
+            dstsum = sum([sum(colbits)<<place for place, colbits in dstbits.items()])
+            srcstr = f'{srcsum:x}'.zfill(int(self.colnum/4)+1)
+            dststr = f'{dstsum:x}'.zfill(int(self.colnum/4)+1)
+            print(f'src: 0x{srcstr}, dst: 0x{dststr}')
+            if srcsum != dstsum:
                 return False
         return True
+
+def main():
+    random.seed(a=0)
+    rawtxt = ''
+    while True:
+        try:
+            rawtxt += input() + '\n'
+        except EOFError:
+            break
+    sim = cmpsim(rawtxt)
+    print('PASS' if sim.randomtest() else 'FAIL')
+
+
+if __name__ == '__main__':
+    main()

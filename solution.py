@@ -7,9 +7,9 @@ import parsegpc
 from problem import problem
 
 class solution(problem):
-    def __init__(self, raw):
-        match = re.search(r'elapsed: \[.+\]', raw)
-        prob, sol = raw.split(match.group(0))
+    def __init__(self, rawtxt):
+        match = re.search(r'elapsed: \[.*\]', rawtxt)
+        prob, sol = rawtxt.split(match.group(0))
         super().__init__()
         super().parse(prob)
         if self.stagemax != self.stagemin:
