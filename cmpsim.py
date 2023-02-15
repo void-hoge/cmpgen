@@ -43,6 +43,19 @@ class cmpsim(solution):
             self.stages[s+1] = copy(nextstagebits)
 
     def build_stages(self):
+        for stage in self.stages:
+            for num in stage:
+                if num < 0:
+                    raise 'invalid stage height detected'
+        wirelens = [sum([stage[col] for stage in self.stages])
+                    for col in range(self.colnum)]
+        for s, length in enumerate(wirelens[::-1]):
+            if length == 0:
+                for stage in self.stages:
+                    stage.pop()
+                self.colnum -= 1
+            else:
+                break
         self.stagepos = [[0 for _ in range(self.colnum)]
                          for _ in range(self.stagemin+1)]
         for s in range(self.stagemin):
