@@ -24,11 +24,18 @@ class solution(problem):
             vals = line.split()
             if len(vals) == 4:
                 s,c,g,n = map(int, vals)
-                self.gpcusage[s][c][g] = n
+                try:
+                    self.gpcusage[s][c][g] = n
+                except:
+                    if n != 0:
+                        raise "invalid solution (gpcusage out-of-range)"
             elif len(vals) == 3:
                 s,c,n = map(int, vals)
-                self.stages[s][c] = n
-
+                try:
+                    self.stages[s][c] = n
+                except:
+                    if n != 0:
+                        raise "invalid solution (stages out-of-range)"
     def margegpcs(self, gpcs):
         for gpc in gpcs:
             if gpc not in self.gpcs:
