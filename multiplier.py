@@ -25,7 +25,9 @@ class multiplier(problem):
         self.gpcin = [gpc['src'] for gpc in self.gpcs]
         self.gpcout = [gpc['dst'] for gpc in self.gpcs]
         self.gpccost = [gpc['cost'] for gpc in self.gpcs]
-        self.initialstage = [i for i in range(1, self.size+1)] + [i for i in range(self.size-1, 0, -1)]
+        self.initialstage = [i for i in range(1, self.size+1)] + \
+            [i for i in range(self.size-1, 0, -1)] + \
+            [0 for _ in range(self.colnum-self.size*2+1)]
         self.gpclimit = max(self.initialstage)
         self.collimit = max(self.initialstage)
 
