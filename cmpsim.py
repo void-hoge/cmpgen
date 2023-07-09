@@ -165,7 +165,7 @@ def main():
         except EOFError:
             break
     sim = cmpsim(rawtxt)
-    print('PASS' if sim.randomtest() else 'FAIL')
+    print('PASS' if sim.randomtest(iteration=1<<10) else 'FAIL')
 
 
 if __name__ == '__main__':
